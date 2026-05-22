@@ -12,7 +12,7 @@ type Deck = {
 type View =
   | { name: "decks" }
   | { name: "cards"; deckId: string }
-  | { name: "study"; deckId: string; cardIndex: number; isBackVisible: boolean };
+  | { name: "study"; deckId: string; reviewQueue: number[]; isBackVisible: boolean };
 
 type StoredState = {
   decks: Deck[];
@@ -132,6 +132,27 @@ const getDeck = (deckId: string): Deck => {
   }
 
   return deck;
+};
+
+const createReviewQueue = (deckId: string): number[] => getDeck(deckId).cards.map((_, index) => index);
+
+const advanceReviewQueue = (reviewQueue: number[], shouldPrioritizeCurrent: boolean): number[] => {
+  const [currentCardIndex, ...remainingQueue] = reviewQueue;
+
+  if (currentCardIndex === undefined) {
+    return reviewQueue;
+  }
+
+  if (remainingQueue.length === 0) {
+    return [currentCardIndex];
+  }
+
+  if (shouldPrioritizeCurrent) {
+    const [nextCardIndex, ...laterQueue] = remainingQueue;
+    return [nextCardIndex, currentCardIndex, ...laterQueue];
+  }
+
+  return [...remainingQueue, currentCardIndex];
 };
 
 const createDeck = async (): Promise<void> => {
@@ -339,8 +360,9 @@ const renderCardEditor = (deckId: string): string => {
   `;
 };
 
-const renderStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): string => {
+const renderStudy = (deckId: string, reviewQueue: number[], isBackVisible: boolean): string => {
   const deck = getDeck(deckId);
+  const cardIndex = reviewQueue[0] ?? 0;
   const card = deck.cards[cardIndex];
   const progress = `${cardIndex + 1} / ${deck.cards.length}`;
   const sideLabel = isBackVisible ? "裏" : "表";
@@ -400,7 +422,7 @@ const bindDeckList = (): void => {
       const deckId = button.dataset.studyDeckId;
 
       if (deckId) {
-        setView({ name: "study", deckId, cardIndex: 0, isBackVisible: false });
+        setView({ name: "study", deckId, reviewQueue: createReviewQueue(deckId), isBackVisible: false });
       }
     });
   });
@@ -466,17 +488,14 @@ const bindCardEditor = (deckId: string): void => {
   });
 };
 
-const bindStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): void => {
-  const deck = getDeck(deckId);
-  const nextCardIndex = (cardIndex + 1) % deck.cards.length;
-
+const bindStudy = (deckId: string, reviewQueue: number[], isBackVisible: boolean): void => {
   app.querySelector<HTMLButtonElement>("[data-back-to-decks]")?.addEventListener("click", () => {
     setView({ name: "decks" });
   });
 
   app.querySelectorAll<HTMLButtonElement>("[data-flip-card]").forEach((button) => {
     button.addEventListener("click", () => {
-      setView({ name: "study", deckId, cardIndex, isBackVisible: !isBackVisible });
+      setView({ name: "study", deckId, reviewQueue, isBackVisible: !isBackVisible });
     });
   });
 
@@ -485,7 +504,12 @@ const bindStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): v
       return;
     }
 
-    setView({ name: "study", deckId, cardIndex: nextCardIndex, isBackVisible: false });
+    setView({
+      name: "study",
+      deckId,
+      reviewQueue: advanceReviewQueue(reviewQueue, true),
+      isBackVisible: false,
+    });
   });
 
   app.querySelector<HTMLButtonElement>("[data-mark-done]")?.addEventListener("click", () => {
@@ -493,7 +517,12 @@ const bindStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): v
       return;
     }
 
-    setView({ name: "study", deckId, cardIndex: nextCardIndex, isBackVisible: false });
+    setView({
+      name: "study",
+      deckId,
+      reviewQueue: advanceReviewQueue(reviewQueue, false),
+      isBackVisible: false,
+    });
   });
 };
 
@@ -510,8 +539,8 @@ const render = (): void => {
     return;
   }
 
-  app.innerHTML = renderStudy(view.deckId, view.cardIndex, view.isBackVisible);
-  bindStudy(view.deckId, view.cardIndex, view.isBackVisible);
+  app.innerHTML = renderStudy(view.deckId, view.reviewQueue, view.isBackVisible);
+  bindStudy(view.deckId, view.reviewQueue, view.isBackVisible);
 };
 
 const style = document.createElement("style");
