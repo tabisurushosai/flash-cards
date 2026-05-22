@@ -1,0 +1,12 @@
+# flash-cards TODO
+- [ ] T001: src/popup.ts に popup骨格(デッキ一覧 + 学習画面)を構築
+- [ ] T002: デッキのCRUDを chrome.storage.local に保存・読込
+- [ ] T003: カードCRUD(表/裏)+並べ替えを実装
+- [ ] T004: 学習モード(カード表示→めくる→できた/まだ)
+- [ ] T005: 「まだ」を優先する簡易復習順
+- [ ] T006: 起動時に storage.local から全状態を復元
+- [ ] T007: _locales ja/en を chrome.i18n で全UIに適用
+- [ ] T008: Premiumゲート(7日トライアル + Stripe Checkout URL)。無料はデッキ2つ、Premiumで無制限+シャッフル+正答率
+- [ ] T009: npm run build を通し ts/lint を解消
+- [ ] T010: release/flash-cards.zip 生成(node_modules除外)
+- [ ] T011: legal/PRIVACY.md と TERMS.md 作成(外部通信なし・データ収集なし)
