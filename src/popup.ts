@@ -1,6 +1,12 @@
 type Card = {
   front: string;
   back: string;
+  stats?: CardStats;
+};
+
+type CardStats = {
+  done: number;
+  again: number;
 };
 
 type Deck = {
@@ -17,9 +23,18 @@ type View =
 type StoredState = {
   decks: Deck[];
   view: View;
+  premium?: PremiumState;
+};
+
+type PremiumState = {
+  trialStartedAt?: string;
+  purchasedAt?: string;
 };
 
 const STORAGE_KEY = "flashCardsState";
+const FREE_DECK_LIMIT = 2;
+const TRIAL_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+const STRIPE_CHECKOUT_URL = "https://checkout.stripe.com/c/pay/cs_test_flash_cards_premium";
 
 type MessageSubstitution = string | string[];
 
@@ -46,6 +61,7 @@ const defaultDecks: Deck[] = [
 
 let decks: Deck[] = [];
 let view: View = { name: "decks" };
+let premium: PremiumState = {};
 
 const app = document.querySelector<HTMLDivElement>("#app");
 const title = document.querySelector("title");
@@ -90,7 +106,16 @@ const isCard = (value: unknown): value is Card => {
   }
 
   const candidate = value as Card;
-  return typeof candidate.front === "string" && typeof candidate.back === "string";
+  return (
+    typeof candidate.front === "string" &&
+    typeof candidate.back === "string" &&
+    (candidate.stats === undefined ||
+      (typeof candidate.stats === "object" &&
+        Number.isInteger(candidate.stats.done) &&
+        candidate.stats.done >= 0 &&
+        Number.isInteger(candidate.stats.again) &&
+        candidate.stats.again >= 0))
+  );
 };
 
 const isDeck = (value: unknown): value is Deck => {
@@ -147,6 +172,70 @@ const isViewForDecks = (value: unknown, decksToSearch: Deck[]): value is View =>
   );
 };
 
+const isPremiumState = (value: unknown): value is PremiumState => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as PremiumState;
+  return (
+    (candidate.trialStartedAt === undefined || typeof candidate.trialStartedAt === "string") &&
+    (candidate.purchasedAt === undefined || typeof candidate.purchasedAt === "string")
+  );
+};
+
+const isTrialActive = (): boolean => {
+  if (!premium.trialStartedAt) {
+    return false;
+  }
+
+  const trialStartedAt = Date.parse(premium.trialStartedAt);
+  return Number.isFinite(trialStartedAt) && Date.now() - trialStartedAt < TRIAL_DURATION_MS;
+};
+
+const isPremiumActive = (): boolean => !!premium.purchasedAt || isTrialActive();
+
+const getTrialDaysLeft = (): number => {
+  if (!premium.trialStartedAt) {
+    return 0;
+  }
+
+  const trialStartedAt = Date.parse(premium.trialStartedAt);
+
+  if (!Number.isFinite(trialStartedAt)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.ceil((TRIAL_DURATION_MS - (Date.now() - trialStartedAt)) / 86400000));
+};
+
+const getAccuracy = (deck: Deck): number | null => {
+  const totals = deck.cards.reduce(
+    (result, card) => ({
+      done: result.done + (card.stats?.done ?? 0),
+      attempts: result.attempts + (card.stats?.done ?? 0) + (card.stats?.again ?? 0),
+    }),
+    { done: 0, attempts: 0 },
+  );
+
+  if (totals.attempts === 0) {
+    return null;
+  }
+
+  return Math.round((totals.done / totals.attempts) * 100);
+};
+
+const shuffleQueue = (queue: number[]): number[] => {
+  const shuffledQueue = [...queue];
+
+  for (let index = shuffledQueue.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledQueue[index], shuffledQueue[swapIndex]] = [shuffledQueue[swapIndex], shuffledQueue[index]];
+  }
+
+  return shuffledQueue;
+};
+
 const loadStoredState = async (): Promise<StoredState | null> => {
   const result = await chrome.storage.local.get(STORAGE_KEY);
   const storedState = result[STORAGE_KEY];
@@ -164,17 +253,19 @@ const loadStoredState = async (): Promise<StoredState | null> => {
   return {
     decks: candidate.decks,
     view: isViewForDecks(candidate.view, candidate.decks) ? candidate.view : { name: "decks" },
+    premium: isPremiumState(candidate.premium) ? candidate.premium : {},
   };
 };
 
 const saveState = async (): Promise<void> => {
-  await chrome.storage.local.set({ [STORAGE_KEY]: { decks, view } satisfies StoredState });
+  await chrome.storage.local.set({ [STORAGE_KEY]: { decks, view, premium } satisfies StoredState });
 };
 
 const loadState = async (): Promise<void> => {
   const storedState = await loadStoredState();
   decks = storedState?.decks ?? defaultDecks;
   view = storedState?.view ?? { name: "decks" };
+  premium = storedState?.premium ?? {};
 
   if (!storedState) {
     await saveState();
@@ -219,6 +310,11 @@ const advanceReviewQueue = (reviewQueue: number[], shouldPrioritizeCurrent: bool
 };
 
 const createDeck = async (): Promise<void> => {
+  if (!isPremiumActive() && decks.length >= FREE_DECK_LIMIT) {
+    window.alert(t("freeDeckLimitMessage"));
+    return;
+  }
+
   decks = [
     ...decks,
     {
@@ -229,6 +325,25 @@ const createDeck = async (): Promise<void> => {
   ];
   await saveState();
   setView({ name: "decks" });
+};
+
+const startTrial = async (): Promise<void> => {
+  if (!premium.trialStartedAt) {
+    premium = { ...premium, trialStartedAt: new Date().toISOString() };
+    await saveState();
+  }
+
+  setView({ name: "decks" });
+};
+
+const openCheckout = async (): Promise<void> => {
+  window.open(STRIPE_CHECKOUT_URL, "_blank", "noopener,noreferrer");
+
+  if (window.confirm(t("checkoutCompleteConfirm"))) {
+    premium = { ...premium, purchasedAt: new Date().toISOString() };
+    await saveState();
+    setView({ name: "decks" });
+  }
 };
 
 const renameDeck = async (deckId: string): Promise<void> => {
@@ -346,14 +461,67 @@ const moveCard = async (deckId: string, cardIndex: number, direction: -1 | 1): P
   setView({ name: "cards", deckId });
 };
 
+const recordAnswer = async (deckId: string, cardIndex: number, result: keyof CardStats): Promise<void> => {
+  decks = decks.map((candidate) => {
+    if (candidate.id !== deckId) {
+      return candidate;
+    }
+
+    return {
+      ...candidate,
+      cards: candidate.cards.map((card, index) => {
+        if (index !== cardIndex) {
+          return card;
+        }
+
+        const stats = card.stats ?? { done: 0, again: 0 };
+        return { ...card, stats: { ...stats, [result]: stats[result] + 1 } };
+      }),
+    };
+  });
+  await saveState();
+};
+
+const renderPremiumPanel = (): string => {
+  const active = isPremiumActive();
+  const trialDaysLeft = getTrialDaysLeft();
+  const status = premium.purchasedAt
+    ? t("premiumPurchasedStatus")
+    : active
+      ? t("trialActiveStatus", String(trialDaysLeft))
+      : premium.trialStartedAt
+        ? t("trialExpiredStatus")
+        : t("freePlanStatus", String(FREE_DECK_LIMIT));
+
+  return `
+    <section class="premium-panel" aria-label="${escapeHtml(t("premiumTitle"))}">
+      <div>
+        <h3>${t("premiumTitle")}</h3>
+        <p>${status}</p>
+      </div>
+      <div class="premium-actions">
+        ${
+          premium.trialStartedAt || premium.purchasedAt
+            ? ""
+            : `<button type="button" data-start-trial>${t("startTrialButton")}</button>`
+        }
+        ${premium.purchasedAt ? "" : `<button type="button" data-open-checkout>${t("checkoutButton")}</button>`}
+      </div>
+    </section>
+  `;
+};
+
 const renderDeckList = (): string => `
   <section class="deck-list" aria-labelledby="deck-list-title">
+    ${renderPremiumPanel()}
     <div class="toolbar">
       <div>
         <h2 id="deck-list-title">${t("decksTitle")}</h2>
         <p>${t("deckCount", String(decks.length))}</p>
       </div>
-      <button type="button" class="primary-button" data-create-deck>${t("addButton")}</button>
+      <button type="button" class="primary-button" data-create-deck ${
+        !isPremiumActive() && decks.length >= FREE_DECK_LIMIT ? "disabled" : ""
+      }>${t("addButton")}</button>
     </div>
     <div class="deck-items">
       ${decks
@@ -363,12 +531,24 @@ const renderDeckList = (): string => `
               <div>
                 <h3>${escapeHtml(deck.name)}</h3>
                 <p>${t("cardCount", String(deck.cards.length))}</p>
+                ${
+                  isPremiumActive()
+                    ? `<p>${t("accuracyLabel", getAccuracy(deck) === null ? t("accuracyNoData") : String(getAccuracy(deck)))}</p>`
+                    : ""
+                }
               </div>
               <div class="deck-actions">
                 <button type="button" data-rename-deck-id="${escapeHtml(deck.id)}">${t("editButton")}</button>
                 <button type="button" data-delete-deck-id="${escapeHtml(deck.id)}">${t("deleteButton")}</button>
                 <button type="button" data-manage-cards-deck-id="${escapeHtml(deck.id)}">${t("cardsButton")}</button>
                 <button type="button" data-study-deck-id="${escapeHtml(deck.id)}" ${deck.cards.length === 0 ? "disabled" : ""}>${t("studyButton")}</button>
+                ${
+                  isPremiumActive()
+                    ? `<button type="button" data-shuffle-study-deck-id="${escapeHtml(deck.id)}" ${
+                        deck.cards.length === 0 ? "disabled" : ""
+                      }>${t("shuffleButton")}</button>`
+                    : ""
+                }
               </div>
             </article>
           `,
@@ -456,6 +636,14 @@ const renderStudy = (deckId: string, reviewQueue: number[], isBackVisible: boole
 };
 
 const bindDeckList = (): void => {
+  app.querySelector<HTMLButtonElement>("[data-start-trial]")?.addEventListener("click", () => {
+    void startTrial();
+  });
+
+  app.querySelector<HTMLButtonElement>("[data-open-checkout]")?.addEventListener("click", () => {
+    void openCheckout();
+  });
+
   app.querySelector<HTMLButtonElement>("[data-create-deck]")?.addEventListener("click", () => {
     void createDeck();
   });
@@ -486,6 +674,21 @@ const bindDeckList = (): void => {
 
       if (deckId) {
         setView({ name: "study", deckId, reviewQueue: createReviewQueue(deckId), isBackVisible: false });
+      }
+    });
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-shuffle-study-deck-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const deckId = button.dataset.shuffleStudyDeckId;
+
+      if (deckId) {
+        setView({
+          name: "study",
+          deckId,
+          reviewQueue: shuffleQueue(createReviewQueue(deckId)),
+          isBackVisible: false,
+        });
       }
     });
   });
@@ -567,12 +770,18 @@ const bindStudy = (deckId: string, reviewQueue: number[], isBackVisible: boolean
       return;
     }
 
-    setView({
-      name: "study",
-      deckId,
-      reviewQueue: advanceReviewQueue(reviewQueue, true),
-      isBackVisible: false,
-    });
+    const cardIndex = reviewQueue[0];
+
+    if (cardIndex !== undefined) {
+      void recordAnswer(deckId, cardIndex, "again").then(() => {
+        setView({
+          name: "study",
+          deckId,
+          reviewQueue: advanceReviewQueue(reviewQueue, true),
+          isBackVisible: false,
+        });
+      });
+    }
   });
 
   app.querySelector<HTMLButtonElement>("[data-mark-done]")?.addEventListener("click", () => {
@@ -580,12 +789,18 @@ const bindStudy = (deckId: string, reviewQueue: number[], isBackVisible: boolean
       return;
     }
 
-    setView({
-      name: "study",
-      deckId,
-      reviewQueue: advanceReviewQueue(reviewQueue, false),
-      isBackVisible: false,
-    });
+    const cardIndex = reviewQueue[0];
+
+    if (cardIndex !== undefined) {
+      void recordAnswer(deckId, cardIndex, "done").then(() => {
+        setView({
+          name: "study",
+          deckId,
+          reviewQueue: advanceReviewQueue(reviewQueue, false),
+          isBackVisible: false,
+        });
+      });
+    }
   });
 };
 
@@ -670,6 +885,28 @@ style.textContent = `
     gap: 12px;
   }
 
+  .premium-panel {
+    display: grid;
+    gap: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px;
+    background: #ffffff;
+  }
+
+  .premium-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .premium-actions button {
+    min-width: 0;
+    padding-right: 6px;
+    padding-left: 6px;
+    font-size: 12px;
+  }
+
   .toolbar,
   .study-header,
   .answer-actions {
@@ -720,7 +957,8 @@ style.textContent = `
   }
 
   .deck-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
   }
 

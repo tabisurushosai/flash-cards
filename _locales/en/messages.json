@@ -96,6 +96,9 @@
   "studyButton": {
     "message": "Study"
   },
+  "shuffleButton": {
+    "message": "Shuffle"
+  },
   "backButton": {
     "message": "Back"
   },
@@ -139,6 +142,54 @@
   },
   "flipCardAria": {
     "message": "Flip card"
+  },
+  "premiumTitle": {
+    "message": "Premium"
+  },
+  "freePlanStatus": {
+    "message": "Free plan: up to $LIMIT$ decks",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "trialActiveStatus": {
+    "message": "7-day trial active: $DAYS$ days left",
+    "placeholders": {
+      "days": {
+        "content": "$1"
+      }
+    }
+  },
+  "trialExpiredStatus": {
+    "message": "Trial ended"
+  },
+  "premiumPurchasedStatus": {
+    "message": "Premium active: unlimited decks, shuffle, and accuracy"
+  },
+  "startTrialButton": {
+    "message": "7-day trial"
+  },
+  "checkoutButton": {
+    "message": "Buy for $3"
+  },
+  "checkoutCompleteConfirm": {
+    "message": "Did you complete the purchase in Stripe Checkout?"
+  },
+  "freeDeckLimitMessage": {
+    "message": "The free plan allows up to 2 decks."
+  },
+  "accuracyLabel": {
+    "message": "Accuracy: $VALUE$%",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "accuracyNoData": {
+    "message": "--"
   },
   "loadError": {
     "message": "Failed to load data."

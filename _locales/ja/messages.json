@@ -96,6 +96,9 @@
   "studyButton": {
     "message": "学習"
   },
+  "shuffleButton": {
+    "message": "シャッフル"
+  },
   "backButton": {
     "message": "戻る"
   },
@@ -139,6 +142,54 @@
   },
   "flipCardAria": {
     "message": "カードをめくる"
+  },
+  "premiumTitle": {
+    "message": "Premium"
+  },
+  "freePlanStatus": {
+    "message": "無料プラン: デッキは$LIMIT$つまで",
+    "placeholders": {
+      "limit": {
+        "content": "$1"
+      }
+    }
+  },
+  "trialActiveStatus": {
+    "message": "7日トライアル中: 残り$DAYS$日",
+    "placeholders": {
+      "days": {
+        "content": "$1"
+      }
+    }
+  },
+  "trialExpiredStatus": {
+    "message": "トライアルは終了しました"
+  },
+  "premiumPurchasedStatus": {
+    "message": "Premium有効: 無制限デッキ、シャッフル、正答率"
+  },
+  "startTrialButton": {
+    "message": "7日トライアル"
+  },
+  "checkoutButton": {
+    "message": "$3で購入"
+  },
+  "checkoutCompleteConfirm": {
+    "message": "Stripe Checkoutで購入を完了しましたか？"
+  },
+  "freeDeckLimitMessage": {
+    "message": "無料プランではデッキは2つまでです。"
+  },
+  "accuracyLabel": {
+    "message": "正答率: $VALUE$%",
+    "placeholders": {
+      "value": {
+        "content": "$1"
+      }
+    }
+  },
+  "accuracyNoData": {
+    "message": "--"
   },
   "loadError": {
     "message": "データの読込に失敗しました。"
