@@ -11,6 +11,7 @@ type Deck = {
 
 type View =
   | { name: "decks" }
+  | { name: "cards"; deckId: string }
   | { name: "study"; deckId: string; cardIndex: number; isBackVisible: boolean };
 
 type StoredState = {
@@ -171,6 +172,96 @@ const deleteDeck = async (deckId: string): Promise<void> => {
   setView({ name: "decks" });
 };
 
+const addCard = async (deckId: string): Promise<void> => {
+  const front = window.prompt("表")?.trim();
+
+  if (!front) {
+    return;
+  }
+
+  const back = window.prompt("裏")?.trim();
+
+  if (!back) {
+    return;
+  }
+
+  decks = decks.map((deck) =>
+    deck.id === deckId ? { ...deck, cards: [...deck.cards, { front, back }] } : deck,
+  );
+  await saveState();
+  setView({ name: "cards", deckId });
+};
+
+const editCard = async (deckId: string, cardIndex: number): Promise<void> => {
+  const deck = getDeck(deckId);
+  const card = deck.cards[cardIndex];
+
+  if (!card) {
+    return;
+  }
+
+  const front = window.prompt("表", card.front)?.trim();
+
+  if (!front) {
+    return;
+  }
+
+  const back = window.prompt("裏", card.back)?.trim();
+
+  if (!back) {
+    return;
+  }
+
+  decks = decks.map((candidate) => {
+    if (candidate.id !== deckId) {
+      return candidate;
+    }
+
+    return {
+      ...candidate,
+      cards: candidate.cards.map((candidateCard, index) =>
+        index === cardIndex ? { front, back } : candidateCard,
+      ),
+    };
+  });
+  await saveState();
+  setView({ name: "cards", deckId });
+};
+
+const deleteCard = async (deckId: string, cardIndex: number): Promise<void> => {
+  const deck = getDeck(deckId);
+  const card = deck.cards[cardIndex];
+
+  if (!card || !window.confirm(`「${card.front}」を削除しますか？`)) {
+    return;
+  }
+
+  decks = decks.map((candidate) =>
+    candidate.id === deckId
+      ? { ...candidate, cards: candidate.cards.filter((_, index) => index !== cardIndex) }
+      : candidate,
+  );
+  await saveState();
+  setView({ name: "cards", deckId });
+};
+
+const moveCard = async (deckId: string, cardIndex: number, direction: -1 | 1): Promise<void> => {
+  const deck = getDeck(deckId);
+  const nextIndex = cardIndex + direction;
+
+  if (nextIndex < 0 || nextIndex >= deck.cards.length) {
+    return;
+  }
+
+  const cards = [...deck.cards];
+  const [card] = cards.splice(cardIndex, 1);
+  cards.splice(nextIndex, 0, card);
+
+  decks = decks.map((candidate) => (candidate.id === deckId ? { ...candidate, cards } : candidate));
+  await saveState();
+  setView({ name: "cards", deckId });
+};
+
 const renderDeckList = (): string => `
   <section class="deck-list" aria-labelledby="deck-list-title">
     <div class="toolbar">
@@ -192,6 +283,7 @@ const renderDeckList = (): string => `
               <div class="deck-actions">
                 <button type="button" data-rename-deck-id="${escapeHtml(deck.id)}">編集</button>
                 <button type="button" data-delete-deck-id="${escapeHtml(deck.id)}">削除</button>
+                <button type="button" data-manage-cards-deck-id="${escapeHtml(deck.id)}">カード</button>
                 <button type="button" data-study-deck-id="${escapeHtml(deck.id)}" ${deck.cards.length === 0 ? "disabled" : ""}>学習</button>
               </div>
             </article>
@@ -201,6 +293,51 @@ const renderDeckList = (): string => `
     </div>
   </section>
 `;
+
+const renderCardEditor = (deckId: string): string => {
+  const deck = getDeck(deckId);
+
+  return `
+    <section class="card-editor" aria-labelledby="card-editor-title">
+      <div class="toolbar">
+        <button type="button" data-back-to-decks>戻る</button>
+        <div>
+          <h2 id="card-editor-title">${escapeHtml(deck.name)}</h2>
+          <p>${deck.cards.length}枚のカード</p>
+        </div>
+        <button type="button" class="primary-button" data-add-card>追加</button>
+      </div>
+      <div class="card-items">
+        ${
+          deck.cards.length === 0
+            ? '<p class="empty-message">カードがありません。</p>'
+            : deck.cards
+                .map(
+                  (card, index) => `
+                    <article class="card-item">
+                      <div class="card-text">
+                        <p class="card-label">表</p>
+                        <h3>${escapeHtml(card.front)}</h3>
+                        <p class="card-label">裏</p>
+                        <p>${escapeHtml(card.back)}</p>
+                      </div>
+                      <div class="card-actions">
+                        <button type="button" data-move-card-up="${index}" ${index === 0 ? "disabled" : ""}>上</button>
+                        <button type="button" data-move-card-down="${index}" ${
+                          index === deck.cards.length - 1 ? "disabled" : ""
+                        }>下</button>
+                        <button type="button" data-edit-card-index="${index}">編集</button>
+                        <button type="button" data-delete-card-index="${index}">削除</button>
+                      </div>
+                    </article>
+                  `,
+                )
+                .join("")
+        }
+      </div>
+    </section>
+  `;
+};
 
 const renderStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): string => {
   const deck = getDeck(deckId);
@@ -261,6 +398,66 @@ const bindDeckList = (): void => {
       }
     });
   });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-manage-cards-deck-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const deckId = button.dataset.manageCardsDeckId;
+
+      if (deckId) {
+        setView({ name: "cards", deckId });
+      }
+    });
+  });
+};
+
+const bindCardEditor = (deckId: string): void => {
+  app.querySelector<HTMLButtonElement>("[data-back-to-decks]")?.addEventListener("click", () => {
+    setView({ name: "decks" });
+  });
+
+  app.querySelector<HTMLButtonElement>("[data-add-card]")?.addEventListener("click", () => {
+    void addCard(deckId);
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-edit-card-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const cardIndex = Number(button.dataset.editCardIndex);
+
+      if (Number.isInteger(cardIndex)) {
+        void editCard(deckId, cardIndex);
+      }
+    });
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-delete-card-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const cardIndex = Number(button.dataset.deleteCardIndex);
+
+      if (Number.isInteger(cardIndex)) {
+        void deleteCard(deckId, cardIndex);
+      }
+    });
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-move-card-up]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const cardIndex = Number(button.dataset.moveCardUp);
+
+      if (Number.isInteger(cardIndex)) {
+        void moveCard(deckId, cardIndex, -1);
+      }
+    });
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-move-card-down]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const cardIndex = Number(button.dataset.moveCardDown);
+
+      if (Number.isInteger(cardIndex)) {
+        void moveCard(deckId, cardIndex, 1);
+      }
+    });
+  });
 };
 
 const bindStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): void => {
@@ -285,13 +482,19 @@ const bindStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): v
 };
 
 const render = (): void => {
-  app.innerHTML = view.name === "decks" ? renderDeckList() : renderStudy(view.deckId, view.cardIndex, view.isBackVisible);
-
   if (view.name === "decks") {
+    app.innerHTML = renderDeckList();
     bindDeckList();
     return;
   }
 
+  if (view.name === "cards") {
+    app.innerHTML = renderCardEditor(view.deckId);
+    bindCardEditor(view.deckId);
+    return;
+  }
+
+  app.innerHTML = renderStudy(view.deckId, view.cardIndex, view.isBackVisible);
   bindStudy(view.deckId, view.cardIndex, view.isBackVisible);
 };
 
@@ -353,6 +556,7 @@ style.textContent = `
   }
 
   .deck-list,
+  .card-editor,
   .study-view {
     display: grid;
     gap: 12px;
@@ -372,6 +576,11 @@ style.textContent = `
     gap: 8px;
   }
 
+  .card-items {
+    display: grid;
+    gap: 8px;
+  }
+
   .deck-item {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -383,9 +592,42 @@ style.textContent = `
     background: #ffffff;
   }
 
+  .card-item {
+    display: grid;
+    gap: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px;
+    background: #ffffff;
+  }
+
+  .card-text {
+    display: grid;
+    gap: 3px;
+  }
+
+  .card-label {
+    margin-top: 0;
+    font-weight: 700;
+  }
+
   .deck-actions {
     display: flex;
     gap: 6px;
+  }
+
+  .card-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .empty-message {
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+    background: #ffffff;
   }
 
   .flash-card {
