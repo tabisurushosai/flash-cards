@@ -343,6 +343,8 @@ const renderStudy = (deckId: string, cardIndex: number, isBackVisible: boolean):
   const deck = getDeck(deckId);
   const card = deck.cards[cardIndex];
   const progress = `${cardIndex + 1} / ${deck.cards.length}`;
+  const sideLabel = isBackVisible ? "裏" : "表";
+  const flipLabel = isBackVisible ? "表に戻す" : "裏を見る";
 
   return `
     <section class="study-view" aria-labelledby="study-title">
@@ -354,11 +356,15 @@ const renderStudy = (deckId: string, cardIndex: number, isBackVisible: boolean):
         </div>
       </div>
       <button type="button" class="flash-card" data-flip-card aria-label="カードをめくる">
+        <small>${sideLabel}</small>
         <span>${escapeHtml(isBackVisible ? card.back : card.front)}</span>
       </button>
+      <button type="button" data-flip-card>${flipLabel}</button>
       <div class="answer-actions">
-        <button type="button" data-mark-again>まだ</button>
-        <button type="button" class="primary-button" data-mark-done>できた</button>
+        <button type="button" data-mark-again ${isBackVisible ? "" : "disabled"}>まだ</button>
+        <button type="button" class="primary-button" data-mark-done ${
+          isBackVisible ? "" : "disabled"
+        }>できた</button>
       </div>
     </section>
   `;
@@ -468,15 +474,25 @@ const bindStudy = (deckId: string, cardIndex: number, isBackVisible: boolean): v
     setView({ name: "decks" });
   });
 
-  app.querySelector<HTMLButtonElement>("[data-flip-card]")?.addEventListener("click", () => {
-    setView({ name: "study", deckId, cardIndex, isBackVisible: !isBackVisible });
+  app.querySelectorAll<HTMLButtonElement>("[data-flip-card]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setView({ name: "study", deckId, cardIndex, isBackVisible: !isBackVisible });
+    });
   });
 
   app.querySelector<HTMLButtonElement>("[data-mark-again]")?.addEventListener("click", () => {
+    if (!isBackVisible) {
+      return;
+    }
+
     setView({ name: "study", deckId, cardIndex: nextCardIndex, isBackVisible: false });
   });
 
   app.querySelector<HTMLButtonElement>("[data-mark-done]")?.addEventListener("click", () => {
+    if (!isBackVisible) {
+      return;
+    }
+
     setView({ name: "study", deckId, cardIndex: nextCardIndex, isBackVisible: false });
   });
 };
@@ -633,12 +649,19 @@ style.textContent = `
   .flash-card {
     display: grid;
     place-items: center;
+    gap: 8px;
     width: 100%;
     min-height: 148px;
     border-color: #94a3b8;
     padding: 16px;
     text-align: center;
     background: #ffffff;
+  }
+
+  .flash-card small {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .flash-card span {
