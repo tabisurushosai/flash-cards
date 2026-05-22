@@ -1,1 +1,146 @@
-{ "extName": { "message": "あんきカード" }, "extDesc": { "message": "表と裏の暗記カードで学習。デッキ管理・自己採点・まだ覚えてないカードを優先。" } }
+{
+  "extName": {
+    "message": "あんきカード"
+  },
+  "extDesc": {
+    "message": "表と裏の暗記カードで学習。デッキ管理・自己採点・まだ覚えてないカードを優先。"
+  },
+  "sampleBasicDeckName": {
+    "message": "基本カード"
+  },
+  "sampleReviewDeckName": {
+    "message": "復習カード"
+  },
+  "sampleHelloFront": {
+    "message": "表: Hello"
+  },
+  "sampleHelloBack": {
+    "message": "裏: こんにちは"
+  },
+  "sampleMorningFront": {
+    "message": "表: Good morning"
+  },
+  "sampleMorningBack": {
+    "message": "裏: おはよう"
+  },
+  "sampleThanksFront": {
+    "message": "表: Thank you"
+  },
+  "sampleThanksBack": {
+    "message": "裏: ありがとう"
+  },
+  "decksTitle": {
+    "message": "デッキ"
+  },
+  "deckCount": {
+    "message": "$COUNT$件",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "cardCount": {
+    "message": "$COUNT$枚のカード",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "newDeckName": {
+    "message": "新しいデッキ $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckNamePrompt": {
+    "message": "デッキ名"
+  },
+  "frontPrompt": {
+    "message": "表"
+  },
+  "backPrompt": {
+    "message": "裏"
+  },
+  "deleteDeckConfirm": {
+    "message": "「$NAME$」を削除しますか？",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "deleteCardConfirm": {
+    "message": "「$FRONT$」を削除しますか？",
+    "placeholders": {
+      "front": {
+        "content": "$1"
+      }
+    }
+  },
+  "addButton": {
+    "message": "追加"
+  },
+  "editButton": {
+    "message": "編集"
+  },
+  "deleteButton": {
+    "message": "削除"
+  },
+  "cardsButton": {
+    "message": "カード"
+  },
+  "studyButton": {
+    "message": "学習"
+  },
+  "backButton": {
+    "message": "戻る"
+  },
+  "moveUpButton": {
+    "message": "上"
+  },
+  "moveDownButton": {
+    "message": "下"
+  },
+  "frontLabel": {
+    "message": "表"
+  },
+  "backLabel": {
+    "message": "裏"
+  },
+  "showFrontButton": {
+    "message": "表に戻す"
+  },
+  "showBackButton": {
+    "message": "裏を見る"
+  },
+  "studyProgress": {
+    "message": "$CURRENT$ / $TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "againButton": {
+    "message": "まだ"
+  },
+  "doneButton": {
+    "message": "できた"
+  },
+  "emptyCards": {
+    "message": "カードがありません。"
+  },
+  "flipCardAria": {
+    "message": "カードをめくる"
+  },
+  "loadError": {
+    "message": "データの読込に失敗しました。"
+  }
+}

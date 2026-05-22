@@ -1,1 +1,146 @@
-{ "extName": { "message": "Flash Cards" }, "extDesc": { "message": "Study with front/back flashcards. Decks, self-grading, and review of cards you missed." } }
+{
+  "extName": {
+    "message": "Flash Cards"
+  },
+  "extDesc": {
+    "message": "Study with front/back flashcards. Decks, self-grading, and review of cards you missed."
+  },
+  "sampleBasicDeckName": {
+    "message": "Basic Cards"
+  },
+  "sampleReviewDeckName": {
+    "message": "Review Cards"
+  },
+  "sampleHelloFront": {
+    "message": "Front: Hello"
+  },
+  "sampleHelloBack": {
+    "message": "Back: Hello"
+  },
+  "sampleMorningFront": {
+    "message": "Front: Good morning"
+  },
+  "sampleMorningBack": {
+    "message": "Back: Good morning"
+  },
+  "sampleThanksFront": {
+    "message": "Front: Thank you"
+  },
+  "sampleThanksBack": {
+    "message": "Back: Thank you"
+  },
+  "decksTitle": {
+    "message": "Decks"
+  },
+  "deckCount": {
+    "message": "$COUNT$ decks",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "cardCount": {
+    "message": "$COUNT$ cards",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "newDeckName": {
+    "message": "New Deck $NUMBER$",
+    "placeholders": {
+      "number": {
+        "content": "$1"
+      }
+    }
+  },
+  "deckNamePrompt": {
+    "message": "Deck name"
+  },
+  "frontPrompt": {
+    "message": "Front"
+  },
+  "backPrompt": {
+    "message": "Back"
+  },
+  "deleteDeckConfirm": {
+    "message": "Delete \"$NAME$\"?",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "deleteCardConfirm": {
+    "message": "Delete \"$FRONT$\"?",
+    "placeholders": {
+      "front": {
+        "content": "$1"
+      }
+    }
+  },
+  "addButton": {
+    "message": "Add"
+  },
+  "editButton": {
+    "message": "Edit"
+  },
+  "deleteButton": {
+    "message": "Delete"
+  },
+  "cardsButton": {
+    "message": "Cards"
+  },
+  "studyButton": {
+    "message": "Study"
+  },
+  "backButton": {
+    "message": "Back"
+  },
+  "moveUpButton": {
+    "message": "Up"
+  },
+  "moveDownButton": {
+    "message": "Down"
+  },
+  "frontLabel": {
+    "message": "Front"
+  },
+  "backLabel": {
+    "message": "Back"
+  },
+  "showFrontButton": {
+    "message": "Show Front"
+  },
+  "showBackButton": {
+    "message": "Show Back"
+  },
+  "studyProgress": {
+    "message": "$CURRENT$ / $TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "againButton": {
+    "message": "Again"
+  },
+  "doneButton": {
+    "message": "Done"
+  },
+  "emptyCards": {
+    "message": "No cards yet."
+  },
+  "flipCardAria": {
+    "message": "Flip card"
+  },
+  "loadError": {
+    "message": "Failed to load data."
+  }
+}

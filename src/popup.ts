@@ -21,19 +21,26 @@ type StoredState = {
 
 const STORAGE_KEY = "flashCardsState";
 
+type MessageSubstitution = string | string[];
+
+const t = (key: string, substitutions?: MessageSubstitution): string => {
+  const message = chrome.i18n.getMessage(key, substitutions);
+  return message || key;
+};
+
 const defaultDecks: Deck[] = [
   {
     id: "sample-basic",
-    name: "基本カード",
+    name: t("sampleBasicDeckName"),
     cards: [
-      { front: "表: Hello", back: "裏: こんにちは" },
-      { front: "表: Good morning", back: "裏: おはよう" },
+      { front: t("sampleHelloFront"), back: t("sampleHelloBack") },
+      { front: t("sampleMorningFront"), back: t("sampleMorningBack") },
     ],
   },
   {
     id: "sample-review",
-    name: "復習カード",
-    cards: [{ front: "表: Thank you", back: "裏: ありがとう" }],
+    name: t("sampleReviewDeckName"),
+    cards: [{ front: t("sampleThanksFront"), back: t("sampleThanksBack") }],
   },
 ];
 
@@ -41,9 +48,19 @@ let decks: Deck[] = [];
 let view: View = { name: "decks" };
 
 const app = document.querySelector<HTMLDivElement>("#app");
+const title = document.querySelector("title");
+const appTitle = document.querySelector<HTMLHeadingElement>("#app-title");
 
 if (!app) {
   throw new Error("App root was not found.");
+}
+
+if (title) {
+  title.textContent = t("extName");
+}
+
+if (appTitle) {
+  appTitle.textContent = t("extName");
 }
 
 const createId = (): string => {
@@ -206,7 +223,7 @@ const createDeck = async (): Promise<void> => {
     ...decks,
     {
       id: createId(),
-      name: `新しいデッキ ${decks.length + 1}`,
+      name: t("newDeckName", String(decks.length + 1)),
       cards: [],
     },
   ];
@@ -216,7 +233,7 @@ const createDeck = async (): Promise<void> => {
 
 const renameDeck = async (deckId: string): Promise<void> => {
   const deck = getDeck(deckId);
-  const name = window.prompt("デッキ名", deck.name)?.trim();
+  const name = window.prompt(t("deckNamePrompt"), deck.name)?.trim();
 
   if (!name) {
     return;
@@ -230,7 +247,7 @@ const renameDeck = async (deckId: string): Promise<void> => {
 const deleteDeck = async (deckId: string): Promise<void> => {
   const deck = getDeck(deckId);
 
-  if (!window.confirm(`「${deck.name}」を削除しますか？`)) {
+  if (!window.confirm(t("deleteDeckConfirm", deck.name))) {
     return;
   }
 
@@ -240,13 +257,13 @@ const deleteDeck = async (deckId: string): Promise<void> => {
 };
 
 const addCard = async (deckId: string): Promise<void> => {
-  const front = window.prompt("表")?.trim();
+  const front = window.prompt(t("frontPrompt"))?.trim();
 
   if (!front) {
     return;
   }
 
-  const back = window.prompt("裏")?.trim();
+  const back = window.prompt(t("backPrompt"))?.trim();
 
   if (!back) {
     return;
@@ -267,13 +284,13 @@ const editCard = async (deckId: string, cardIndex: number): Promise<void> => {
     return;
   }
 
-  const front = window.prompt("表", card.front)?.trim();
+  const front = window.prompt(t("frontPrompt"), card.front)?.trim();
 
   if (!front) {
     return;
   }
 
-  const back = window.prompt("裏", card.back)?.trim();
+  const back = window.prompt(t("backPrompt"), card.back)?.trim();
 
   if (!back) {
     return;
@@ -299,7 +316,7 @@ const deleteCard = async (deckId: string, cardIndex: number): Promise<void> => {
   const deck = getDeck(deckId);
   const card = deck.cards[cardIndex];
 
-  if (!card || !window.confirm(`「${card.front}」を削除しますか？`)) {
+  if (!card || !window.confirm(t("deleteCardConfirm", card.front))) {
     return;
   }
 
@@ -333,10 +350,10 @@ const renderDeckList = (): string => `
   <section class="deck-list" aria-labelledby="deck-list-title">
     <div class="toolbar">
       <div>
-        <h2 id="deck-list-title">デッキ</h2>
-        <p>${decks.length}件</p>
+        <h2 id="deck-list-title">${t("decksTitle")}</h2>
+        <p>${t("deckCount", String(decks.length))}</p>
       </div>
-      <button type="button" class="primary-button" data-create-deck>追加</button>
+      <button type="button" class="primary-button" data-create-deck>${t("addButton")}</button>
     </div>
     <div class="deck-items">
       ${decks
@@ -345,13 +362,13 @@ const renderDeckList = (): string => `
             <article class="deck-item">
               <div>
                 <h3>${escapeHtml(deck.name)}</h3>
-                <p>${deck.cards.length}枚のカード</p>
+                <p>${t("cardCount", String(deck.cards.length))}</p>
               </div>
               <div class="deck-actions">
-                <button type="button" data-rename-deck-id="${escapeHtml(deck.id)}">編集</button>
-                <button type="button" data-delete-deck-id="${escapeHtml(deck.id)}">削除</button>
-                <button type="button" data-manage-cards-deck-id="${escapeHtml(deck.id)}">カード</button>
-                <button type="button" data-study-deck-id="${escapeHtml(deck.id)}" ${deck.cards.length === 0 ? "disabled" : ""}>学習</button>
+                <button type="button" data-rename-deck-id="${escapeHtml(deck.id)}">${t("editButton")}</button>
+                <button type="button" data-delete-deck-id="${escapeHtml(deck.id)}">${t("deleteButton")}</button>
+                <button type="button" data-manage-cards-deck-id="${escapeHtml(deck.id)}">${t("cardsButton")}</button>
+                <button type="button" data-study-deck-id="${escapeHtml(deck.id)}" ${deck.cards.length === 0 ? "disabled" : ""}>${t("studyButton")}</button>
               </div>
             </article>
           `,
@@ -367,34 +384,34 @@ const renderCardEditor = (deckId: string): string => {
   return `
     <section class="card-editor" aria-labelledby="card-editor-title">
       <div class="toolbar">
-        <button type="button" data-back-to-decks>戻る</button>
+        <button type="button" data-back-to-decks>${t("backButton")}</button>
         <div>
           <h2 id="card-editor-title">${escapeHtml(deck.name)}</h2>
-          <p>${deck.cards.length}枚のカード</p>
+          <p>${t("cardCount", String(deck.cards.length))}</p>
         </div>
-        <button type="button" class="primary-button" data-add-card>追加</button>
+        <button type="button" class="primary-button" data-add-card>${t("addButton")}</button>
       </div>
       <div class="card-items">
         ${
           deck.cards.length === 0
-            ? '<p class="empty-message">カードがありません。</p>'
+            ? `<p class="empty-message">${t("emptyCards")}</p>`
             : deck.cards
                 .map(
                   (card, index) => `
                     <article class="card-item">
                       <div class="card-text">
-                        <p class="card-label">表</p>
+                        <p class="card-label">${t("frontLabel")}</p>
                         <h3>${escapeHtml(card.front)}</h3>
-                        <p class="card-label">裏</p>
+                        <p class="card-label">${t("backLabel")}</p>
                         <p>${escapeHtml(card.back)}</p>
                       </div>
                       <div class="card-actions">
-                        <button type="button" data-move-card-up="${index}" ${index === 0 ? "disabled" : ""}>上</button>
+                        <button type="button" data-move-card-up="${index}" ${index === 0 ? "disabled" : ""}>${t("moveUpButton")}</button>
                         <button type="button" data-move-card-down="${index}" ${
                           index === deck.cards.length - 1 ? "disabled" : ""
-                        }>下</button>
-                        <button type="button" data-edit-card-index="${index}">編集</button>
-                        <button type="button" data-delete-card-index="${index}">削除</button>
+                        }>${t("moveDownButton")}</button>
+                        <button type="button" data-edit-card-index="${index}">${t("editButton")}</button>
+                        <button type="button" data-delete-card-index="${index}">${t("deleteButton")}</button>
                       </div>
                     </article>
                   `,
@@ -410,29 +427,29 @@ const renderStudy = (deckId: string, reviewQueue: number[], isBackVisible: boole
   const deck = getDeck(deckId);
   const cardIndex = reviewQueue[0] ?? 0;
   const card = deck.cards[cardIndex];
-  const progress = `${cardIndex + 1} / ${deck.cards.length}`;
-  const sideLabel = isBackVisible ? "裏" : "表";
-  const flipLabel = isBackVisible ? "表に戻す" : "裏を見る";
+  const progress = t("studyProgress", [String(cardIndex + 1), String(deck.cards.length)]);
+  const sideLabel = isBackVisible ? t("backLabel") : t("frontLabel");
+  const flipLabel = isBackVisible ? t("showFrontButton") : t("showBackButton");
 
   return `
     <section class="study-view" aria-labelledby="study-title">
       <div class="study-header">
-        <button type="button" data-back-to-decks>戻る</button>
+        <button type="button" data-back-to-decks>${t("backButton")}</button>
         <div>
           <h2 id="study-title">${escapeHtml(deck.name)}</h2>
           <p>${progress}</p>
         </div>
       </div>
-      <button type="button" class="flash-card" data-flip-card aria-label="カードをめくる">
+      <button type="button" class="flash-card" data-flip-card aria-label="${escapeHtml(t("flipCardAria"))}">
         <small>${sideLabel}</small>
         <span>${escapeHtml(isBackVisible ? card.back : card.front)}</span>
       </button>
       <button type="button" data-flip-card>${flipLabel}</button>
       <div class="answer-actions">
-        <button type="button" data-mark-again ${isBackVisible ? "" : "disabled"}>まだ</button>
+        <button type="button" data-mark-again ${isBackVisible ? "" : "disabled"}>${t("againButton")}</button>
         <button type="button" class="primary-button" data-mark-done ${
           isBackVisible ? "" : "disabled"
-        }>できた</button>
+        }>${t("doneButton")}</button>
       </div>
     </section>
   `;
@@ -756,6 +773,6 @@ void loadState()
     render();
   })
   .catch((error: unknown) => {
-    app.textContent = "データの読込に失敗しました。";
+    app.textContent = t("loadError");
     console.error(error);
   });
