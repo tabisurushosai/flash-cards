@@ -13,7 +13,13 @@ type View =
   | { name: "decks" }
   | { name: "study"; deckId: string; cardIndex: number; isBackVisible: boolean };
 
-const decks: Deck[] = [
+type StoredState = {
+  decks: Deck[];
+};
+
+const STORAGE_KEY = "flashCardsState";
+
+const defaultDecks: Deck[] = [
   {
     id: "sample-basic",
     name: "基本カード",
@@ -29,6 +35,7 @@ const decks: Deck[] = [
   },
 ];
 
+let decks: Deck[] = [];
 let view: View = { name: "decks" };
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -36,6 +43,80 @@ const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
   throw new Error("App root was not found.");
 }
+
+const createId = (): string => {
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+
+    return entities[character];
+  });
+
+const isCard = (value: unknown): value is Card => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Card;
+  return typeof candidate.front === "string" && typeof candidate.back === "string";
+};
+
+const isDeck = (value: unknown): value is Deck => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Deck;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.name === "string" &&
+    Array.isArray(candidate.cards) &&
+    candidate.cards.every(isCard)
+  );
+};
+
+const loadStoredState = async (): Promise<StoredState | null> => {
+  const result = await chrome.storage.local.get(STORAGE_KEY);
+  const storedState = result[STORAGE_KEY];
+
+  if (!storedState || typeof storedState !== "object") {
+    return null;
+  }
+
+  const candidate = storedState as StoredState;
+
+  if (!Array.isArray(candidate.decks) || !candidate.decks.every(isDeck)) {
+    return null;
+  }
+
+  return { decks: candidate.decks };
+};
+
+const saveState = async (): Promise<void> => {
+  await chrome.storage.local.set({ [STORAGE_KEY]: { decks } satisfies StoredState });
+};
+
+const loadState = async (): Promise<void> => {
+  const storedState = await loadStoredState();
+  decks = storedState?.decks ?? defaultDecks;
+
+  if (!storedState) {
+    await saveState();
+  }
+};
 
 const setView = (nextView: View): void => {
   view = nextView;
@@ -52,6 +133,44 @@ const getDeck = (deckId: string): Deck => {
   return deck;
 };
 
+const createDeck = async (): Promise<void> => {
+  decks = [
+    ...decks,
+    {
+      id: createId(),
+      name: `新しいデッキ ${decks.length + 1}`,
+      cards: [],
+    },
+  ];
+  await saveState();
+  setView({ name: "decks" });
+};
+
+const renameDeck = async (deckId: string): Promise<void> => {
+  const deck = getDeck(deckId);
+  const name = window.prompt("デッキ名", deck.name)?.trim();
+
+  if (!name) {
+    return;
+  }
+
+  decks = decks.map((candidate) => (candidate.id === deckId ? { ...candidate, name } : candidate));
+  await saveState();
+  setView({ name: "decks" });
+};
+
+const deleteDeck = async (deckId: string): Promise<void> => {
+  const deck = getDeck(deckId);
+
+  if (!window.confirm(`「${deck.name}」を削除しますか？`)) {
+    return;
+  }
+
+  decks = decks.filter((candidate) => candidate.id !== deckId);
+  await saveState();
+  setView({ name: "decks" });
+};
+
 const renderDeckList = (): string => `
   <section class="deck-list" aria-labelledby="deck-list-title">
     <div class="toolbar">
@@ -59,7 +178,7 @@ const renderDeckList = (): string => `
         <h2 id="deck-list-title">デッキ</h2>
         <p>${decks.length}件</p>
       </div>
-      <button type="button" class="primary-button" disabled>追加</button>
+      <button type="button" class="primary-button" data-create-deck>追加</button>
     </div>
     <div class="deck-items">
       ${decks
@@ -67,10 +186,14 @@ const renderDeckList = (): string => `
           (deck) => `
             <article class="deck-item">
               <div>
-                <h3>${deck.name}</h3>
+                <h3>${escapeHtml(deck.name)}</h3>
                 <p>${deck.cards.length}枚のカード</p>
               </div>
-              <button type="button" data-study-deck-id="${deck.id}">学習</button>
+              <div class="deck-actions">
+                <button type="button" data-rename-deck-id="${escapeHtml(deck.id)}">編集</button>
+                <button type="button" data-delete-deck-id="${escapeHtml(deck.id)}">削除</button>
+                <button type="button" data-study-deck-id="${escapeHtml(deck.id)}" ${deck.cards.length === 0 ? "disabled" : ""}>学習</button>
+              </div>
             </article>
           `,
         )
@@ -89,12 +212,12 @@ const renderStudy = (deckId: string, cardIndex: number, isBackVisible: boolean):
       <div class="study-header">
         <button type="button" data-back-to-decks>戻る</button>
         <div>
-          <h2 id="study-title">${deck.name}</h2>
+          <h2 id="study-title">${escapeHtml(deck.name)}</h2>
           <p>${progress}</p>
         </div>
       </div>
       <button type="button" class="flash-card" data-flip-card aria-label="カードをめくる">
-        <span>${isBackVisible ? card.back : card.front}</span>
+        <span>${escapeHtml(isBackVisible ? card.back : card.front)}</span>
       </button>
       <div class="answer-actions">
         <button type="button" data-mark-again>まだ</button>
@@ -105,6 +228,30 @@ const renderStudy = (deckId: string, cardIndex: number, isBackVisible: boolean):
 };
 
 const bindDeckList = (): void => {
+  app.querySelector<HTMLButtonElement>("[data-create-deck]")?.addEventListener("click", () => {
+    void createDeck();
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-rename-deck-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const deckId = button.dataset.renameDeckId;
+
+      if (deckId) {
+        void renameDeck(deckId);
+      }
+    });
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-delete-deck-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const deckId = button.dataset.deleteDeckId;
+
+      if (deckId) {
+        void deleteDeck(deckId);
+      }
+    });
+  });
+
   app.querySelectorAll<HTMLButtonElement>("[data-study-deck-id]").forEach((button) => {
     button.addEventListener("click", () => {
       const deckId = button.dataset.studyDeckId;
@@ -213,7 +360,6 @@ style.textContent = `
 
   .toolbar,
   .study-header,
-  .deck-item,
   .answer-actions {
     display: flex;
     align-items: center;
@@ -227,10 +373,19 @@ style.textContent = `
   }
 
   .deck-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 10px;
     background: #ffffff;
+  }
+
+  .deck-actions {
+    display: flex;
+    gap: 6px;
   }
 
   .flash-card {
@@ -256,4 +411,11 @@ style.textContent = `
 `;
 document.head.append(style);
 
-render();
+void loadState()
+  .then(() => {
+    render();
+  })
+  .catch((error: unknown) => {
+    app.textContent = "データの読込に失敗しました。";
+    console.error(error);
+  });
