@@ -16,6 +16,7 @@ type View =
 
 type StoredState = {
   decks: Deck[];
+  view: View;
 };
 
 const STORAGE_KEY = "flashCardsState";
@@ -89,6 +90,46 @@ const isDeck = (value: unknown): value is Deck => {
   );
 };
 
+const deckExists = (decksToSearch: Deck[], deckId: string): boolean =>
+  decksToSearch.some((deck) => deck.id === deckId);
+
+const isValidReviewQueue = (deck: Deck, value: unknown): value is number[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (cardIndex) =>
+      Number.isInteger(cardIndex) && cardIndex >= 0 && cardIndex < deck.cards.length,
+  );
+
+const isViewForDecks = (value: unknown, decksToSearch: Deck[]): value is View => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as View;
+
+  if (candidate.name === "decks") {
+    return true;
+  }
+
+  if (candidate.name === "cards") {
+    return typeof candidate.deckId === "string" && deckExists(decksToSearch, candidate.deckId);
+  }
+
+  if (candidate.name !== "study" || typeof candidate.deckId !== "string") {
+    return false;
+  }
+
+  const deck = decksToSearch.find((deckToSearch) => deckToSearch.id === candidate.deckId);
+
+  return (
+    !!deck &&
+    deck.cards.length > 0 &&
+    isValidReviewQueue(deck, candidate.reviewQueue) &&
+    typeof candidate.isBackVisible === "boolean"
+  );
+};
+
 const loadStoredState = async (): Promise<StoredState | null> => {
   const result = await chrome.storage.local.get(STORAGE_KEY);
   const storedState = result[STORAGE_KEY];
@@ -103,16 +144,20 @@ const loadStoredState = async (): Promise<StoredState | null> => {
     return null;
   }
 
-  return { decks: candidate.decks };
+  return {
+    decks: candidate.decks,
+    view: isViewForDecks(candidate.view, candidate.decks) ? candidate.view : { name: "decks" },
+  };
 };
 
 const saveState = async (): Promise<void> => {
-  await chrome.storage.local.set({ [STORAGE_KEY]: { decks } satisfies StoredState });
+  await chrome.storage.local.set({ [STORAGE_KEY]: { decks, view } satisfies StoredState });
 };
 
 const loadState = async (): Promise<void> => {
   const storedState = await loadStoredState();
   decks = storedState?.decks ?? defaultDecks;
+  view = storedState?.view ?? { name: "decks" };
 
   if (!storedState) {
     await saveState();
@@ -122,6 +167,7 @@ const loadState = async (): Promise<void> => {
 const setView = (nextView: View): void => {
   view = nextView;
   render();
+  void saveState();
 };
 
 const getDeck = (deckId: string): Deck => {
